@@ -112,42 +112,22 @@ const editViviendas = (req, res) => {
 };
 
 const deleteViviendas = (req, res) => {
-  const { id } = req.params;
-  const estadoInactivo = "INACTIVO";
-  const estadoActivo = "ACTIVO";
+  const { id } = req.params;//pedimos el id de la vivienda 
+
   try {
     connection.query(
-      `SELECT Estado FROM propietarios WHERE idPropietario = ?`,
+      `SELECT * FROM ReciboGastoEncabezado WHERE idVivienda = ?`,
       [id],
       (error, results) => {
         if (error) {
           console.log(error);
         } else {
-          let status = results[0].Estado;
-          if (status === "ACTIVO") {
-            connection.query(
-              `UPDATE propietarios SET Estado = '${estadoInactivo}' WHERE idPropietario = ?`,
-              [id],
-              (error, results) => {
-                if (error) {
-                  console.log(error);
-                } else {
-                  res.json({ message: "Propietario inactivado" });
-                }
-              }
-            );
-          } else {
-            connection.query(
-              `UPDATE propietarios SET Estado = '${estadoActivo}' WHERE idPropietario = ?`,
-              [id],
-              (error, results) => {
-                if (error) {
-                  console.log(error);
-                } else {
-                  res.json({ message: "Propietario Activado" });
-                }
-              }
-            );
+          if(results.length > 0){
+             res.json({message:"NO PUEDES BORRAR ESTA VIVIENDA YA QUE TIENE FACTURAS ENLAZADAS"});
+          }else{
+             connection.query(`DELETE FROM vivienda WHERE codigo = ?`,[id],(error,results)=>{
+                 error ? console.log(error) : res.json({message:"Vivienda eliminada correctamente"});
+             });
           }
         }
       }
