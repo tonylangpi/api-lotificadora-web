@@ -77,35 +77,32 @@ const createViviendas = (req, res) => {
 };
 const editViviendas = (req, res) => {
   const {
-    nombre,
-    apellido,
-    correo,
-    telefono,
-    direccion,
-    idUsuario,
-    dpi,
+    Codigo,
+    descripcion,
+    CantidadHabitantes,
+    medidas,
     idPropietario,
+    idUsuario,
   } = req.body;
   try {
     connection.query(
-      "UPDATE propietarios SET ? WHERE idPropietario = ?",
+      "UPDATE vivienda SET ? WHERE codigo = ?",
       [
         {
-          nombre: nombre,
-          apellido: apellido,
-          correo: correo,
-          telefono: telefono,
-          direccion: direccion,
+          codigo: Codigo,
+          descripcion: descripcion,
+          CantidadHabitantes: CantidadHabitantes,
+          medidas: medidas,
+          idPropietario: idPropietario,
           idUsuario: idUsuario,
-          dpi: dpi,
         },
-        idPropietario,
+        Codigo,
       ],
       (error, results) => {
         if (error) {
           console.log(error);
         } else {
-          res.json({ message: "información de propietario actualizada" });
+          res.json({ message: `la vivienda con codigo ${Codigo} ha sido actualizada`});
         }
       }
     );
