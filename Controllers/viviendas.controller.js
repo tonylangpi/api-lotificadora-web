@@ -1,33 +1,40 @@
 const { connection } = require("../Database/bd");
 require("dotenv").config();
 
-const getViviendas = (req, res) => {
-  connection.query(
-    `select v.codigo, v.descripcion, v.CantidadHabitantes, v.medidas, CONCAT(p.nombre, p.apellido) as NombreCompleto, p.idPropietario from vivienda v
-  inner join propietarios p on p.idPropietario = v.idPropietario`,
-    (error, results) => {
-      if (error) {
-        console.error(error);
-      } else {
-        res.json(results);
-      }
-    }
-  );
+const getViviendas = async(req, res) => {
+  try {
+    const viviendas = await connection.query(
+      `select v.codigo, v.descripcion, v.CantidadHabitantes, v.medidas, CONCAT(p.nombre, p.apellido) as NombreCompleto, p.idPropietario from vivienda v
+    inner join propietarios p on p.idPropietario = v.idPropietario` );
+    const propietarios = await connection.query(`SELECT idPropietario, nombre, apellido FROM  propietarios`);
+    res.json({
+      viviendas: viviendas[0],
+      propietarios: propietarios[0]
+    })
+  } catch (error) {
+     console.log(error);
+     res.json({message:"algo ocurrio mal"});
+  }
+ 
 };
 
-const getViviendabyId = (req, res) => {
+const getViviendabyId = async(req, res) => {
   const { codigo } = req.params;
-  connection.query(
-    `SELECT * FROM  vivienda WHERE codigo = ?`,
-    [codigo],
-    (error, results) => {
-      if (error) {
-        console.error(error);
-      } else {
-        res.json(results);
-      }
-    }
-  );
+  try {
+     const detallevivienda = await  connection.query(
+      `SELECT * FROM  vivienda WHERE codigo = ?`,
+      [codigo]
+    );
+    const propietarios = await connection.query(`SELECT idPropietario, nombre, apellido FROM  propietarios`);
+    res.json({
+      detalleviviendas: detallevivienda[0],
+      propietarios: propietarios[0]
+    })
+  } catch (error) {
+      console.log(error);
+      res.json({message:"algo salio mal"});
+  }
+ 
 };
 const createViviendas = (req, res) => {
   const {
@@ -111,27 +118,18 @@ const editViviendas = (req, res) => {
   }
 };
 
-const deleteViviendas = (req, res) => {
+const deleteViviendas = async(req, res) => {
   const { id } = req.params;//pedimos el id de la vivienda 
 
   try {
-    connection.query(
-      `SELECT * FROM ReciboGastoEncabezado WHERE idVivienda = ?`,
-      [id],
-      (error, results) => {
-        if (error) {
-          console.log(error);
-        } else {
-          if(results.length > 0){
-             res.json({message:"NO PUEDES BORRAR ESTA VIVIENDA YA QUE TIENE FACTURAS ENLAZADAS"});
-          }else{
-             connection.query(`DELETE FROM vivienda WHERE codigo = ?`,[id],(error,results)=>{
-                 error ? console.log(error) : res.json({message:"Vivienda eliminada correctamente"});
-             });
-          }
-        }
-      }
-    );
+   const reciboGastos = await connection.query(`SELECT * FROM ReciboGastoEncabezado WHERE idVivienda = ?`,
+   [id]);
+   if(reciboGastos[0].length > 0){
+      res.json({message:"no puedes borrar la vivienda pues ya tiene historial de facturas"});
+   }else{
+    connection.query(`DELETE FROM vivienda WHERE codigo = ?`,[id]);
+     res.json({message:"VIVIENDA ELIMINADA"});
+   }
   } catch (error) {
     res.json(error);
   }

@@ -2,14 +2,15 @@
 const { connection } = require("../Database/bd");
 require("dotenv").config();
 
-const getPropietarios = (req, res) => {
-  connection.query(`SELECT * FROM  propietarios`, (error, results) => {
-    if (error) {
-      console.error(error);
-    } else {
-      res.json(results);
-    }
-  });
+const getPropietarios = async(req, res) => {
+  try {
+     const propietarios = await connection.query(`SELECT * FROM  propietarios`);
+      res.json(propietarios[0]);
+  } catch (error) {
+      console.log(error);
+      res.json({message:"algo salio mal"});
+  }
+
 };
 
 const getPropietariosByEstado = (req, res) => {
@@ -52,15 +53,9 @@ const createPropietarios = (req, res) => {
           idUsuario: idUsuario,
           dpi: dpi,
           Estado: Estado
-        },
-        (error, results) => {
-          if (error) {
-            console.error(error);
-          } else {
-            res.json({ message: "propietario creado" });
-          }
         }
       );
+      res.json({message:"propietario  creado"});
     }
   } catch (error) {
     console.log(error);
@@ -69,47 +64,27 @@ const createPropietarios = (req, res) => {
 const editPropietarios = (req, res) => {
     const{nombre, apellido, correo, telefono, direccion, idUsuario, dpi, idPropietario} = req.body;
     try {
-        connection.query('UPDATE propietarios SET ? WHERE idPropietario = ?', [{nombre:nombre,apellido:apellido,correo:correo,telefono:telefono,direccion:direccion,idUsuario:idUsuario,dpi:dpi}, idPropietario],(error,results) =>{
-            if(error){
-                console.log(error);
-            }else{
-                res.json({message:"información de propietario actualizada"})
-            }
-        });
+        connection.query('UPDATE propietarios SET ? WHERE idPropietario = ?', [{nombre:nombre,apellido:apellido,correo:correo,telefono:telefono,direccion:direccion,idUsuario:idUsuario,dpi:dpi}, idPropietario]);
+        res.json({message:"Propietario actualizado"})
     } catch (error) {
         console.log(error);
     }
 };
 
-const deletePropietarios = (req, res) =>{
+const deletePropietarios = async(req, res) =>{
     const {id} = req.params; 
     const estadoInactivo = 'INACTIVO';
     const estadoActivo = 'ACTIVO'; 
   try {
-     connection.query(`SELECT Estado FROM propietarios WHERE idPropietario = ?`,[id],(error,results) =>{
-       if(error){
-         console.log(error);
-       }else{
-          let status = results[0].Estado;
-          if(status === "ACTIVO"){
-            connection.query(`UPDATE propietarios SET Estado = '${estadoInactivo}' WHERE idPropietario = ?`, [id],(error,results) =>{
-              if(error){
-                  console.log(error);
-              }else{
-                  res.json({message:"Propietario inactivado"})
-              }
-          });
-          }else{
-            connection.query(`UPDATE propietarios SET Estado = '${estadoActivo}' WHERE idPropietario = ?`, [id],(error,results) =>{
-              if(error){
-                  console.log(error);
-              }else{
-                  res.json({message:"Propietario Activado"})
-              }
-          });
-          }
-       }
-     })
+    const Estado = await connection.query(`SELECT Estado FROM propietarios WHERE idPropietario = ?`,[id]);
+    let EstadoFinal = Estado[0]; 
+    if(EstadoFinal[0]?.Estado == "ACTIVO"){
+      connection.query(`UPDATE propietarios SET Estado = '${estadoInactivo}' WHERE idPropietario = ?`, [id]);
+      res.json({message:"Propietario inactivado"});
+    }else{
+      connection.query(`UPDATE propietarios SET Estado = '${estadoActivo}' WHERE idPropietario = ?`, [id]);
+      res.json({message:"Propietario Activado"});
+    }
   } catch (error) {
      res.json(error)
   }
