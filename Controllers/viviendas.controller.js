@@ -36,7 +36,7 @@ const getViviendabyId = async(req, res) => {
   }
  
 };
-const createViviendas = (req, res) => {
+const createViviendas = async(req, res) => {
   const {
     Codigo,
     descripcion,
@@ -59,24 +59,24 @@ const createViviendas = (req, res) => {
         message: "Faltan datos",
       });
     } else {
-      connection.query(
-        "INSERT INTO vivienda SET ?",
-        {
-          codigo: Codigo,
-          descripcion: descripcion,
-          CantidadHabitantes: CantidadHabitantes,
-          medidas: medidas,
-          idPropietario: idPropietario,
-          idUsuario: idUsuario,
-        },
-        (error, results) => {
-          if (error) {
-            console.error(error);
-          } else {
-            res.json({ message: `Vivienda con codigo ${Codigo} Creada` });
+      const viviendaFound = await connection.query(`SELECT * FROM vivienda WHERE codigo = ?`,[Codigo]);
+      console.log(viviendaFound);
+      if(viviendaFound[0].length > 0){
+         res.json({message:`El codigo ${Codigo} , ya existe en una vivienda`});
+      }else{
+        connection.query(
+          "INSERT INTO vivienda SET ?",
+          {
+            codigo: Codigo,
+            descripcion: descripcion,
+            CantidadHabitantes: CantidadHabitantes,
+            medidas: medidas,
+            idPropietario: idPropietario,
+            idUsuario: idUsuario,
           }
-        }
-      );
+        );
+        res.json({message:`Vivienda con codigo ${Codigo} creada`});
+      }
     }
   } catch (error) {
     console.log(error);
@@ -104,15 +104,9 @@ const editViviendas = (req, res) => {
           idUsuario: idUsuario,
         },
         Codigo,
-      ],
-      (error, results) => {
-        if (error) {
-          console.log(error);
-        } else {
-          res.json({ message: `la vivienda con codigo ${Codigo} ha sido actualizada`});
-        }
-      }
+      ]
     );
+    res.json({message:"vivienda editada correctamente"});
   } catch (error) {
     console.log(error);
   }
