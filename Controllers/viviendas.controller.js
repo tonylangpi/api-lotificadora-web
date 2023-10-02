@@ -60,7 +60,6 @@ const createViviendas = async(req, res) => {
       });
     } else {
       const viviendaFound = await connection.query(`SELECT * FROM vivienda WHERE codigo = ?`,[Codigo]);
-      console.log(viviendaFound);
       if(viviendaFound[0].length > 0){
          res.json({message:`El codigo ${Codigo} , ya existe en una vivienda`});
       }else{
