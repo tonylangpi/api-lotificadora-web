@@ -9,117 +9,111 @@ const getInfoEncabezadosFactura = async(req, res) => {
      inner join EstadoFactura EF on  EF.id = RE.Estado
      inner join vivienda V on V.codigo = RE.idVivienda
      inner join propietarios p on p.idPropietario = V.idPropietario`); 
-      res.json(factEncabezado[0]); 
+     const viviendas = await connection.query(`select codigo from vivienda`); 
+      res.json({
+         encabezados: factEncabezado[0],
+         viviendas : viviendas[0]
+      }); 
   } catch (error) {
      console.log(error);
      res.json({message:"algo ocurrio mal"});
   }
 };
 
-const getViviendabyId = async(req, res) => {
-  const { codigo } = req.params;
-  try {
-     const detallevivienda = await  connection.query(
-      `SELECT * FROM  vivienda WHERE codigo = ?`,
-      [codigo]
-    );
-    const propietarios = await connection.query(`SELECT idPropietario, nombre, apellido FROM  propietarios`);
-    res.json({
-      detalleviviendas: detallevivienda[0],
-      propietarios: propietarios[0]
-    })
-  } catch (error) {
-      console.log(error);
-      res.json({message:"algo salio mal"});
-  }
+// const getViviendabyId = async(req, res) => {
+//   const { codigo } = req.params;
+//   try {
+//      const detallevivienda = await  connection.query(
+//       `SELECT * FROM  vivienda WHERE codigo = ?`,
+//       [codigo]
+//     );
+//     const propietarios = await connection.query(`SELECT idPropietario, nombre, apellido FROM  propietarios`);
+//     res.json({
+//       detalleviviendas: detallevivienda[0],
+//       propietarios: propietarios[0]
+//     })
+//   } catch (error) {
+//       console.log(error);
+//       res.json({message:"algo salio mal"});
+//   }
  
-};
-const createViviendas = async(req, res) => {
+// };
+const createFacturaEncabezado = async(req, res) => {
   const {
-    Codigo,
-    descripcion,
-    CantidadHabitantes,
-    medidas,
-    idPropietario,
+    Mes,
+    idVivienda,
+    Estado,
     idUsuario,
   } = req.body;
 
   try {
     if (
-      !Codigo ||
-      !descripcion ||
-      !CantidadHabitantes ||
-      !medidas ||
-      !idPropietario ||
+      !Mes ||
+      !idVivienda ||
+      !Estado ||
       !idUsuario
     ) {
       res.json({
         message: "Faltan datos",
       });
     } else {
-      const viviendaFound = await connection.query(`SELECT * FROM vivienda WHERE codigo = ?`,[Codigo]);
-      if(viviendaFound[0].length > 0){
-         res.json({message:`El codigo ${Codigo} , ya existe en una vivienda`});
-      }else{
+      
         connection.query(
-          "INSERT INTO vivienda SET ?",
+          "INSERT INTO ReciboGastoEncabezado SET ?",
           {
-            codigo: Codigo,
-            descripcion: descripcion,
-            CantidadHabitantes: CantidadHabitantes,
-            medidas: medidas,
-            idPropietario: idPropietario,
+            Mes: Mes,
+            idVivienda: idVivienda,
+            Estado: Estado,
             idUsuario: idUsuario,
           }
         );
-        res.json({message:`Vivienda con codigo ${Codigo} creada`});
+        res.json({message:`Encabezado creado satisfactoriamente`});
       }
-    }
   } catch (error) {
     console.log(error);
   }
 };
-const editViviendas = (req, res) => {
-  const {
-    Codigo,
-    descripcion,
-    CantidadHabitantes,
-    medidas,
-    idPropietario,
-    idUsuario,
-  } = req.body;
-  try {
-    connection.query(
-      "UPDATE vivienda SET ? WHERE codigo = ?",
-      [
-        {
-          codigo: Codigo,
-          descripcion: descripcion,
-          CantidadHabitantes: CantidadHabitantes,
-          medidas: medidas,
-          idPropietario: idPropietario,
-          idUsuario: idUsuario,
-        },
-        Codigo,
-      ]
-    );
-    res.json({message:"vivienda editada correctamente"});
-  } catch (error) {
-    console.log(error);
-  }
-};
+// const editViviendas = (req, res) => {
+//   const {
+//     Codigo,
+//     descripcion,
+//     CantidadHabitantes,
+//     medidas,
+//     idPropietario,
+//     idUsuario,
+//   } = req.body;
+//   try {
+//     connection.query(
+//       "UPDATE vivienda SET ? WHERE codigo = ?",
+//       [
+//         {
+//           codigo: Codigo,
+//           descripcion: descripcion,
+//           CantidadHabitantes: CantidadHabitantes,
+//           medidas: medidas,
+//           idPropietario: idPropietario,
+//           idUsuario: idUsuario,
+//         },
+//         Codigo,
+//       ]
+//     );
+//     res.json({message:"vivienda editada correctamente"});
+//   } catch (error) {
+//     console.log(error);
+//   }
+// };
 
-const deleteViviendas = async(req, res) => {
+const deleteEncabezado = async(req, res) => {
   const { id } = req.params;//pedimos el id de la vivienda 
 
   try {
-   const reciboGastos = await connection.query(`SELECT * FROM ReciboGastoEncabezado WHERE idVivienda = ?`,
+   const reciboGastos = await connection.query(`SELECT * FROM ReciboGastoDetalle WHERE idReciboGastoEncabezado = ?`,
    [id]);
    if(reciboGastos[0].length > 0){
-      res.json({message:"no puedes borrar la vivienda pues ya tiene historial de facturas"});
+      res.json({message:"no puedes borrar este encabezado pues ya tiene detalles"});
    }else{
-    connection.query(`DELETE FROM vivienda WHERE codigo = ?`,[id]);
-     res.json({message:"VIVIENDA ELIMINADA"});
+    connection.query(`DELETE FROM ReciboGastoEncabezado WHERE idReciboGastoEncabezado = ?`,[id]);
+     res.json({message:"ENCABEZADO ELIMINADO"});
    }
   } catch (error) {
     res.json(error);
@@ -127,8 +121,6 @@ const deleteViviendas = async(req, res) => {
 };
 module.exports = {
   getInfoEncabezadosFactura,
-  createViviendas,
-  editViviendas,
-  deleteViviendas,
-  getViviendabyId
+  createFacturaEncabezado,
+  deleteEncabezado
 };
