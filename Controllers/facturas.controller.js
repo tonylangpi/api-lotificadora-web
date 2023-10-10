@@ -3,13 +3,15 @@ require("dotenv").config();
 
 const getInfoEncabezadosFactura = async(req, res) => {
   try {
-     const factEncabezado = await connection.query(`select RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, RE.fecha_recibo
+     const factEncabezado = await connection.query(`select RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo
      from ReciboGastoEncabezado RE
      inner join Mes M on M.Mesid = RE.Mes
      inner join EstadoFactura EF on  EF.id = RE.Estado
      inner join vivienda V on V.codigo = RE.idVivienda
      inner join propietarios p on p.idPropietario = V.idPropietario`); 
-     const viviendas = await connection.query(`select codigo from vivienda`); 
+     const viviendas = await connection.query(`select V.codigo, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.Estado as EstadoPropietario from vivienda v
+     inner join propietarios p on p.idPropietario = v.idPropietario
+     WHERE p.Estado = 'ACTIVO' `); 
       res.json({
          encabezados: factEncabezado[0],
          viviendas : viviendas[0]
@@ -19,7 +21,22 @@ const getInfoEncabezadosFactura = async(req, res) => {
      res.json({message:"algo ocurrio mal"});
   }
 };
-
+const facturasDetalle = async(req,res) =>{
+  const{idencabezado} = req.params; 
+  try {
+     const detalleFact = await connection.query(`select S.descripcion, RD.cuota from ReciboGastoDetalle RD
+     inner join Servicios S on S.idServicio = RD.idServicio 
+     where RD.idReciboGastoEncabezado = ?`,[idencabezado]); 
+     const servicios = await connection.query(`SELECT * FROM Servicios`); 
+     res.json({
+       detalles: detalleFact[0],
+       servicios: servicios[0]
+     })
+  } catch (error) {
+      console.log(error);
+      res.json({message:"algo salio bad"});
+  }
+}
 // const getViviendabyId = async(req, res) => {
 //   const { codigo } = req.params;
 //   try {
@@ -122,5 +139,6 @@ const deleteEncabezado = async(req, res) => {
 module.exports = {
   getInfoEncabezadosFactura,
   createFacturaEncabezado,
-  deleteEncabezado
+  deleteEncabezado,
+  facturasDetalle
 };
