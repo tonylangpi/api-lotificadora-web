@@ -24,7 +24,7 @@ const getInfoEncabezadosFactura = async(req, res) => {
 const facturasDetalle = async(req,res) =>{
   const{idencabezado} = req.params; 
   try {
-     const detalleFact = await connection.query(`select S.descripcion, RD.cuota from ReciboGastoDetalle RD
+     const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
      inner join Servicios S on S.idServicio = RD.idServicio 
      where RD.idReciboGastoEncabezado = ?`,[idencabezado]); 
      const servicios = await connection.query(`SELECT * FROM Servicios`); 
@@ -90,6 +90,38 @@ const createFacturaEncabezado = async(req, res) => {
     console.log(error);
   }
 };
+const createDetallesFactura = async(req, res) => {
+  const {
+    idReciboGastoEncabezado,
+    idServicio,
+    cuota,
+  } = req.body;
+
+  try {
+    if (
+      !idReciboGastoEncabezado ||
+      !idServicio ||
+      !cuota
+    ) {
+      res.json({
+        message: "Faltan datos",
+      });
+    } else {
+      
+        connection.query(
+          "INSERT INTO ReciboGastoDetalle SET ?",
+          {
+            idReciboGastoEncabezado: idReciboGastoEncabezado,
+            idServicio: idServicio,
+            cuota: cuota,
+          }
+        );
+        res.json({message:`Detalle creado satisfactoriamente`});
+      }
+  } catch (error) {
+    console.log(error);
+  }
+};
 // const editViviendas = (req, res) => {
 //   const {
 //     Codigo,
@@ -136,9 +168,22 @@ const deleteEncabezado = async(req, res) => {
     res.json(error);
   }
 };
+
+const deleteDetalles = async(req, res) => {
+  const { id } = req.params;//pedimos el id del detalle 
+
+  try {
+    connection.query(`DELETE FROM ReciboGastoDetalle WHERE idDetalle = ?`,[id]);
+     res.json({message:"DETALLE ELIMINADO"});
+  } catch (error) {
+    res.json(error);
+  }
+};
 module.exports = {
   getInfoEncabezadosFactura,
   createFacturaEncabezado,
   deleteEncabezado,
-  facturasDetalle
+  facturasDetalle,
+  createDetallesFactura,
+  deleteDetalles
 };
