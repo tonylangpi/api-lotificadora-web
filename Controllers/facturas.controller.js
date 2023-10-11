@@ -179,11 +179,71 @@ const deleteDetalles = async(req, res) => {
     res.json(error);
   }
 };
+
+const ConsultaFacturaCliente = async(req, res)=>{
+  const{mes, year, viviendacod} = req.body; 
+  try {
+     const verificarVivienda = await connection.query(`select * from vivienda where codigo = ?`,[viviendacod]); 
+     if(verificarVivienda[0]?.length > 0){
+      const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
+      FROM ReciboGastoEncabezado re
+      INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
+      INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
+      inner join Mes M on M.Mesid = RE.Mes
+      inner join EstadoFactura EF on  EF.id = re.Estado
+      inner join vivienda V on V.codigo = re.idVivienda
+      inner join propietarios p on p.idPropietario = V.idPropietario
+      where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.idVivienda = ? AND re.Estado = 2
+      GROUP BY DC.idReciboGastoEncabezado
+      ORDER BY re.idReciboGastoEncabezado ASC;`,[mes,year,viviendacod]);
+      const registros = rows[0]; 
+      if(rows.length > 0){
+        const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
+        inner join Servicios S on S.idServicio = RD.idServicio 
+        where RD.idReciboGastoEncabezado = ?`,[registros?.CodigoEncabezado]); 
+         res.json({
+           encabezado: rows,
+           detalle: detalleFact[0]
+         })
+      }else{
+        res.json({message:"no han generado la factura del mes"}); 
+      } 
+     }else{
+        res.json({message:"El numero de vivienda ingresado no esta registrado en el sistema"}); 
+     }
+  } catch (error) {
+      console.log(error); 
+      res.json(error); 
+  }
+}
+
+const facturasPendientesMes = async(req,res) =>{
+  const{mes, year}  = req.query; 
+  try {
+    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo as CorreoPropietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
+    FROM ReciboGastoEncabezado re
+    INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
+    INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
+    inner join Mes M on M.Mesid = RE.Mes
+    inner join EstadoFactura EF on  EF.id = re.Estado
+    inner join vivienda V on V.codigo = re.idVivienda
+    inner join propietarios p on p.idPropietario = V.idPropietario
+    where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.Estado = 2
+    GROUP BY DC.idReciboGastoEncabezado
+    ORDER BY re.idReciboGastoEncabezado ASC;`,[mes,year]);
+    res.json(rows);
+  } catch (error) {
+     console.log(error); 
+     res.json({message:"algo salio mal"}); 
+  }
+}
 module.exports = {
   getInfoEncabezadosFactura,
   createFacturaEncabezado,
   deleteEncabezado,
   facturasDetalle,
   createDetallesFactura,
-  deleteDetalles
+  deleteDetalles,
+  ConsultaFacturaCliente,
+  facturasPendientesMes
 };

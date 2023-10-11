@@ -13,11 +13,4 @@ const connection =  mysql.createPool({
     port: BD_PORT,
     database:BD_DATABASE,
 });
-connection.getConnection((error) => {
-    if (error) {
-      console.error('El error de conexión es: ' + error);
-      return;
-    }
-    console.log('Conectado a la base de datos.');
-  });
 module.exports = {connection}
