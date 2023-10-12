@@ -10,7 +10,7 @@ router.get('/facturasdetalle/:idencabezado', facturasDetalle);
 router.post('/createDetalles',createDetallesFactura); 
 router.delete('/deleteDetalle/:id',deleteDetalles); 
 router.post('/consultafactcliente', ConsultaFacturaCliente); 
-router.get('/facturasPendientesMes', facturasPendientesMes); 
+router.get('/facturasPendientesMes/:year', facturasPendientesMes); 
 router.post('/sendmail',sendMailCliente)
 
 module.exports = router;

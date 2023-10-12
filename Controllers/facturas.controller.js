@@ -4,12 +4,16 @@ require("dotenv").config();
 
 const getInfoEncabezadosFactura = async(req, res) => {
   try {
-     const factEncabezado = await connection.query(`select RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo
-     from ReciboGastoEncabezado RE
+     const factEncabezado = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, COALESCE(SUM(dc.cuota),0) AS totalRecibo
+     FROM ReciboGastoEncabezado re
+     LEFT JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
+     LEFT JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
      inner join Mes M on M.Mesid = RE.Mes
-     inner join EstadoFactura EF on  EF.id = RE.Estado
-     inner join vivienda V on V.codigo = RE.idVivienda
-     inner join propietarios p on p.idPropietario = V.idPropietario`); 
+     inner join EstadoFactura EF on  EF.id = re.Estado
+     inner join vivienda V on V.codigo = re.idVivienda
+     inner join propietarios p on p.idPropietario = V.idPropietario
+     GROUP BY DC.idReciboGastoEncabezado
+     ORDER BY re.idReciboGastoEncabezado ASC`); 
      const viviendas = await connection.query(`select V.codigo, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.Estado as EstadoPropietario from vivienda v
      inner join propietarios p on p.idPropietario = v.idPropietario
      WHERE p.Estado = 'ACTIVO' `); 
@@ -219,7 +223,7 @@ const ConsultaFacturaCliente = async(req, res)=>{
 }
 
 const facturasPendientesMes = async(req,res) =>{
-  const{mes, year}  = req.query; 
+  const{year}  = req.params; 
   try {
     const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo as CorreoPropietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
     FROM ReciboGastoEncabezado re
@@ -229,9 +233,9 @@ const facturasPendientesMes = async(req,res) =>{
     inner join EstadoFactura EF on  EF.id = re.Estado
     inner join vivienda V on V.codigo = re.idVivienda
     inner join propietarios p on p.idPropietario = V.idPropietario
-    where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.Estado = 2
+    where YEAR(re.fecha_recibo) = ? AND re.Estado = 2
     GROUP BY DC.idReciboGastoEncabezado
-    ORDER BY re.idReciboGastoEncabezado ASC;`,[mes,year]);
+    ORDER BY re.idReciboGastoEncabezado ASC;`,[year]);
     res.json(rows);
   } catch (error) {
      console.log(error); 
@@ -258,13 +262,6 @@ const sendMailCliente = async(req,res) =>{
         const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
         inner join Servicios S on S.idServicio = RD.idServicio 
         where RD.idReciboGastoEncabezado = ?`,[registros?.CodigoEncabezado]); 
-        console.log( detalleFact[0].map((det, index) =>{
-          return  `<tr key=${index}>
-          <td>${det.descripcion}</td>
-          <td>${det.cuota}</td>
-         </tr>`
-        }
-        ));
         const result =  await transporter.sendMail({
           from: `Lotificadora Mazat ${process.env.EMAIL}`,
           to:correo,
@@ -295,6 +292,7 @@ const sendMailCliente = async(req,res) =>{
             <h1>Factura</h1>
             <p>Fecha: ${registros.fecha_recibo}</p>
             <p>Propietario: ${registros.Propietario}</p>
+            <p>Numero de la casa: ${registros.CodVivienda}</p>
             <p>Mes: ${registros.Mes}</p>
             <p>Estado: ${registros.EstadoPago}</p>
             <p>Total a pagar: ${registros.totalRecibo}</p>
@@ -306,14 +304,14 @@ const sendMailCliente = async(req,res) =>{
                 </tr>
               </thead>
               <tbody>
-                ${detalleFact[0].map((det, index) =>
-                  `<tr key=${index}>
-                   <td>${det.descripcion}</td>
-                   <td>${det.cuota}</td>
-                  </tr>`
-                )}
+               ${detalleFact[0].map(p => 
+                `<tr key=${p.idDetalle}>
+                 <td>${p.descripcion}</td> 
+                 <td>${p.cuota}</td>
+                 </tr>`).join('')}
               </tbody>
             </table>
+            <h1>Te recordamos que pagues tu factura de gastos por favor</h1>
           </body>
           </html>`
        });
