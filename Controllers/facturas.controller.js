@@ -324,6 +324,91 @@ const sendMailCliente = async(req,res) =>{
      res.json({message:"algo salio mal"}); 
   }
 }
+
+const pagarFactura = async(req,res) =>{
+  const{idVivienda, encabezadoFactura, nombreTarjeta, numeroTarjeta, expiracion,cvv}  = req.body; 
+  const estadoPagado  = 1;
+  try {
+    const updateFactura = await connection.query(`UPDATE ReciboGastoEncabezado SET Estado = ${estadoPagado} WHERE idReciboGastoEncabezado = ? AND idVivienda = ?`,[encabezadoFactura, idVivienda]); 
+    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
+    FROM ReciboGastoEncabezado re
+    INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
+    INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
+    inner join Mes M on M.Mesid = RE.Mes
+    inner join EstadoFactura EF on  EF.id = re.Estado
+    inner join vivienda V on V.codigo = re.idVivienda
+    inner join propietarios p on p.idPropietario = V.idPropietario
+    where re.idReciboGastoEncabezado = ? AND re.idVivienda = ? 
+    GROUP BY DC.idReciboGastoEncabezado
+    ORDER BY re.idReciboGastoEncabezado ASC`,[encabezadoFactura, idVivienda] );
+    const registros = rows[0]; 
+    if(rows.length > 0){
+      const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
+      inner join Servicios S on S.idServicio = RD.idServicio 
+      where RD.idReciboGastoEncabezado = ?`,[registros?.CodigoEncabezado]); 
+      const result =  await transporter.sendMail({
+        from: `Lotificadora Mazat ${process.env.EMAIL}`,
+        to:registros?.correo,
+        subject:'Factura de pagos servicios generada',
+        html:`<!DOCTYPE html>
+        <html>
+        <head>
+          <title>Factura</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              font-size: 12px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th, td {
+              border: 1px solid black;
+              padding: 5px;
+            }
+            th {
+              text-align: center;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Factura</h1>
+          <p>Fecha: ${registros.fecha_recibo}</p>
+          <p>Propietario: ${registros.Propietario}</p>
+          <p>Numero de la casa: ${registros.CodVivienda}</p>
+          <p>Mes: ${registros.Mes}</p>
+          <p>Estado: ${registros.EstadoPago}</p>
+          <p>Total a pagar: ${registros.totalRecibo}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th>cuota</th>
+              </tr>
+            </thead>
+            <tbody>
+             ${detalleFact[0].map(p => 
+              `<tr key=${p.idDetalle}>
+               <td>${p.descripcion}</td> 
+               <td>${p.cuota}</td>
+               </tr>`).join('')}
+            </tbody>
+          </table>
+          <h1>GRACIAS POR PAGAR TU FACTURA</h1>
+        </body>
+        </html>`
+     });
+     res.json({message:"PAGO PROCESADO"}); 
+    }else{
+      res.json({message:"no han generado la factura del mes"}); 
+    } 
+  } catch (error) {
+     console.log(error); 
+     res.json({message:"algo salio mal"}); 
+  }
+}
+
 module.exports = {
   getInfoEncabezadosFactura,
   createFacturaEncabezado,
@@ -333,5 +418,6 @@ module.exports = {
   deleteDetalles,
   ConsultaFacturaCliente,
   facturasPendientesMes,
-  sendMailCliente
+  sendMailCliente,
+  pagarFactura
 };
