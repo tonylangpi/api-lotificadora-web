@@ -32,7 +32,7 @@ const facturasDetalle = async(req,res) =>{
      const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
      inner join Servicios S on S.idServicio = RD.idServicio 
      where RD.idReciboGastoEncabezado = ?`,[idencabezado]); 
-     const servicios = await connection.query(`SELECT * FROM Servicios`); 
+     const servicios = await connection.query(`SELECT * FROM Servicios WHERE Estado ='ACTIVO'`); 
      res.json({
        detalles: detalleFact[0],
        servicios: servicios[0]
@@ -79,7 +79,10 @@ const createFacturaEncabezado = async(req, res) => {
         message: "Faltan datos",
       });
     } else {
-      
+       const FacturaExistenteDeMes = await connection.query(`select * from ReciboGastoEncabezado where idVivienda = ? and Estado = ? and Mes = ?`,[idVivienda,Estado,Mes]);
+       if(FacturaExistenteDeMes[0].length > 0){
+           res.json({message:"ya generaste una factura no pagada con el mes actual, si te equivocaste deberias anularla y volverla a crear"});
+       }else{
         connection.query(
           "INSERT INTO ReciboGastoEncabezado SET ?",
           {
@@ -90,6 +93,7 @@ const createFacturaEncabezado = async(req, res) => {
           }
         );
         res.json({message:`Encabezado creado satisfactoriamente`});
+       }
       }
   } catch (error) {
     console.log(error);
@@ -112,8 +116,11 @@ const createDetallesFactura = async(req, res) => {
         message: "Faltan datos",
       });
     } else {
-      
-        connection.query(
+       const ServicioYaRegistrado = await connection.query(`SELECT * FROM ReciboGastoDetalle WHERE idServicio = ? and idReciboGastoEncabezado = ?`,[idServicio,idReciboGastoEncabezado]);
+       if(ServicioYaRegistrado[0].length > 0){
+         res.json({message:"Este servicio ya se registro como detalle en esta factura"})
+       }else{
+        await connection.query(
           "INSERT INTO ReciboGastoDetalle SET ?",
           {
             idReciboGastoEncabezado: idReciboGastoEncabezado,
@@ -122,6 +129,7 @@ const createDetallesFactura = async(req, res) => {
           }
         );
         res.json({message:`Detalle creado satisfactoriamente`});
+       }
       }
   } catch (error) {
     console.log(error);
