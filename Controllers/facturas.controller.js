@@ -12,7 +12,7 @@ const getInfoEncabezadosFactura = async(req, res) => {
      inner join EstadoFactura EF on  EF.id = re.Estado
      inner join vivienda V on V.codigo = re.idVivienda
      inner join propietarios p on p.idPropietario = V.idPropietario
-     GROUP BY DC.idReciboGastoEncabezado
+     GROUP BY DC.idReciboGastoEncabezado, EF.id, v.codigo
      ORDER BY re.idReciboGastoEncabezado ASC`); 
      const viviendas = await connection.query(`select V.codigo, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.Estado as EstadoPropietario from vivienda v
      inner join propietarios p on p.idPropietario = v.idPropietario
@@ -159,16 +159,11 @@ const createDetallesFactura = async(req, res) => {
 
 const deleteEncabezado = async(req, res) => {
   const { id } = req.params;//pedimos el id de la vivienda 
-
+  const anulado = 3;
   try {
-   const reciboGastos = await connection.query(`SELECT * FROM ReciboGastoDetalle WHERE idReciboGastoEncabezado = ?`,
+    await connection.query(`UPDATE ReciboGastoEncabezado SET Estado = ${anulado} WHERE idReciboGastoEncabezado = ?`,
    [id]);
-   if(reciboGastos[0].length > 0){
-      res.json({message:"no puedes borrar este encabezado pues ya tiene detalles"});
-   }else{
-    connection.query(`DELETE FROM ReciboGastoEncabezado WHERE idReciboGastoEncabezado = ?`,[id]);
-     res.json({message:"ENCABEZADO ELIMINADO"});
-   }
+    res.json({message:"Factura anulada"});
   } catch (error) {
     res.json(error);
   }
@@ -225,17 +220,17 @@ const ConsultaFacturaCliente = async(req, res)=>{
 const facturasPendientesMes = async(req,res) =>{
   const{year}  = req.params; 
   try {
-    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo as CorreoPropietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
+    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, COALESCE(SUM(dc.cuota),0) AS totalRecibo
     FROM ReciboGastoEncabezado re
-    INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
-    INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
+    LEFT JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
+    LEFT JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
     inner join Mes M on M.Mesid = RE.Mes
     inner join EstadoFactura EF on  EF.id = re.Estado
     inner join vivienda V on V.codigo = re.idVivienda
     inner join propietarios p on p.idPropietario = V.idPropietario
-    where YEAR(re.fecha_recibo) = ? AND re.Estado = 2
-    GROUP BY DC.idReciboGastoEncabezado
-    ORDER BY re.idReciboGastoEncabezado ASC;`,[year]);
+     where YEAR(re.fecha_recibo) = ? AND re.Estado = 2
+    GROUP BY DC.idReciboGastoEncabezado, EF.id, v.codigo
+    ORDER BY re.idReciboGastoEncabezado ASC`,[year]);
     res.json(rows);
   } catch (error) {
      console.log(error); 
