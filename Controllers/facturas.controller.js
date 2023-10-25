@@ -266,7 +266,7 @@ const sendMailCliente = async(req,res) =>{
         inner join Servicios S on S.idServicio = RD.idServicio 
         where RD.idReciboGastoEncabezado = ?`,[registros?.CodigoEncabezado]); 
         const result =  await transporter.sendMail({
-          from: `Lotificadora Mazat ${process.env.EMAIL}`,
+          from: `Lotificadora ServiHogar ${process.env.EMAIL}`,
           to:correo,
           subject:'Factura de pagos servicios generada',
           html:`<!DOCTYPE html>
@@ -350,7 +350,7 @@ const pagarFactura = async(req,res) =>{
       inner join Servicios S on S.idServicio = RD.idServicio 
       where RD.idReciboGastoEncabezado = ?`,[registros?.CodigoEncabezado]); 
       const result =  await transporter.sendMail({
-        from: `Lotificadora Mazat ${process.env.EMAIL}`,
+        from: `Lotificadora ServiHogar ${process.env.EMAIL}`,
         to:registros?.correo,
         subject:'Factura de pagos servicios generada',
         html:`<!DOCTYPE html>
