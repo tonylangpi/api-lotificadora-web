@@ -6,7 +6,7 @@ const { config } = require("dotenv");
 const app = express();
 app.use(express.json());
 const corsOptions = {
-  origin: 'http://localhost:3000',
+  origin: 'https://proyecto-web-lotificadora.vercel.app',
   credentials: true, // Habilita el envío de cookies u otros datos de credenciales
 };
 
