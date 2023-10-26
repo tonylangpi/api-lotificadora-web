@@ -4,17 +4,32 @@ require("dotenv").config();
 
 const getInfoEncabezadosFactura = async(req, res) => {
   try {
-     const factEncabezado = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, COALESCE(SUM(dc.cuota),0) AS totalRecibo
-     FROM ReciboGastoEncabezado re
-     LEFT JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
-     LEFT JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
-     inner join Mes M on M.Mesid = RE.Mes
-     inner join EstadoFactura EF on  EF.id = re.Estado
-     inner join vivienda V on V.codigo = re.idVivienda
-     inner join propietarios p on p.idPropietario = V.idPropietario
-     GROUP BY DC.idReciboGastoEncabezado, EF.id, v.codigo
-     ORDER BY re.idReciboGastoEncabezado ASC`); 
-     const viviendas = await connection.query(`select V.codigo, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.Estado as EstadoPropietario from vivienda v
+     const factEncabezado = await connection.query(`SELECT 
+     re.idReciboGastoEncabezado as CodigoEncabezado,
+     CONCAT(p.nombre, ' ', p.apellido) as Propietario,
+     p.correo,
+     M.nombreMes as Mes,
+     EF.Estado as EstadoPago,
+     V.codigo as CodVivienda,
+     SUBSTRING(re.fecha_recibo, 1, 10) as fecha_recibo,
+     COALESCE(SUM(dc.cuota), 0) AS totalRecibo
+ FROM ReciboGastoEncabezado re
+ LEFT JOIN ReciboGastoDetalle dc ON re.idReciboGastoEncabezado = dc.idReciboGastoEncabezado
+ LEFT JOIN Servicios PDC ON dc.idServicio = PDC.idServicio
+ INNER JOIN Mes M ON M.Mesid = re.Mes
+ INNER JOIN EstadoFactura EF ON EF.id = re.Estado
+ INNER JOIN vivienda V ON V.codigo = re.idVivienda
+ INNER JOIN propietarios p ON p.idPropietario = V.idPropietario
+ GROUP BY 
+     re.idReciboGastoEncabezado,
+     CONCAT(p.nombre, ' ', p.apellido), -- Include the CONCAT in the GROUP BY
+     p.correo,
+     M.nombreMes,
+     EF.Estado,
+     V.codigo,
+     SUBSTRING(re.fecha_recibo, 1, 10)
+ ORDER BY re.idReciboGastoEncabezado ASC`); 
+     const viviendas = await connection.query(`select v.codigo, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.Estado as EstadoPropietario from vivienda v
      inner join propietarios p on p.idPropietario = v.idPropietario
      WHERE p.Estado = 'ACTIVO' `); 
       res.json({
@@ -83,16 +98,21 @@ const createFacturaEncabezado = async(req, res) => {
        if(FacturaExistenteDeMes[0].length > 0){
            res.json({message:"ya generaste una factura no pagada con el mes actual, si te equivocaste deberias anularla y volverla a crear"});
        }else{
-        connection.query(
-          "INSERT INTO ReciboGastoEncabezado SET ?",
-          {
-            Mes: Mes,
-            idVivienda: idVivienda,
-            Estado: Estado,
-            idUsuario: idUsuario,
-          }
-        );
-        res.json({message:`Encabezado creado satisfactoriamente`});
+        const FacturaExistenteDeMesPagada = await connection.query(`select * from ReciboGastoEncabezado where idVivienda = ? and Estado = ? and Mes = ?`,[idVivienda,1,Mes]);
+        if(FacturaExistenteDeMesPagada[0].length > 0){
+           res.json({message:"ya fue pagada esta factura con el mes actual y el numero de vivienda actual"});
+        }else{
+          await connection.query(
+            "INSERT INTO ReciboGastoEncabezado SET ?",
+            {
+              Mes: Mes,
+              idVivienda: idVivienda,
+              Estado: Estado,
+              idUsuario: idUsuario,
+            }
+          );
+          res.json({message:`Encabezado creado satisfactoriamente`});
+        }
        }
       }
   } catch (error) {
@@ -193,17 +213,32 @@ const ConsultaFacturaCliente = async(req, res)=>{
   try {
      const verificarVivienda = await connection.query(`select * from vivienda where codigo = ?`,[viviendacod]); 
      if(verificarVivienda[0]?.length > 0){
-      const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
-      FROM ReciboGastoEncabezado re
-      INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
-      INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
-      inner join Mes M on M.Mesid = RE.Mes
-      inner join EstadoFactura EF on  EF.id = re.Estado
-      inner join vivienda V on V.codigo = re.idVivienda
-      inner join propietarios p on p.idPropietario = V.idPropietario
-      where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.idVivienda = ? AND re.Estado = 2
-      GROUP BY DC.idReciboGastoEncabezado
-      ORDER BY re.idReciboGastoEncabezado ASC;`,[mes,year,viviendacod]);
+      const  [rows] = await connection.query(`SELECT 
+      re.idReciboGastoEncabezado as CodigoEncabezado,
+      CONCAT(p.nombre, ' ', p.apellido) as Propietario,
+      p.correo,
+      M.nombreMes as Mes,
+      EF.Estado as EstadoPago,
+      V.codigo as CodVivienda,
+      SUBSTRING(re.fecha_recibo, 1, 10) as fecha_recibo,
+      COALESCE(SUM(dc.cuota), 0) AS totalRecibo
+  FROM ReciboGastoEncabezado re
+  LEFT JOIN ReciboGastoDetalle dc ON re.idReciboGastoEncabezado = dc.idReciboGastoEncabezado
+  LEFT JOIN Servicios PDC ON dc.idServicio = PDC.idServicio
+  INNER JOIN Mes M ON M.Mesid = re.Mes
+  INNER JOIN EstadoFactura EF ON EF.id = re.Estado
+  INNER JOIN vivienda V ON V.codigo = re.idVivienda
+  INNER JOIN propietarios p ON p.idPropietario = V.idPropietario
+    where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.idVivienda =  ? AND re.Estado = 2
+  GROUP BY 
+      re.idReciboGastoEncabezado,
+      CONCAT(p.nombre, ' ', p.apellido), -- Include the CONCAT in the GROUP BY
+      p.correo,
+      M.nombreMes,
+      EF.Estado,
+      V.codigo,
+      SUBSTRING(re.fecha_recibo, 1, 10)
+  ORDER BY re.idReciboGastoEncabezado ASC`,[mes,year,viviendacod]);
       const registros = rows[0]; 
       if(rows.length > 0){
         const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
@@ -228,17 +263,32 @@ const ConsultaFacturaCliente = async(req, res)=>{
 const facturasPendientesMes = async(req,res) =>{
   const{year}  = req.params; 
   try {
-    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, COALESCE(SUM(dc.cuota),0) AS totalRecibo
-    FROM ReciboGastoEncabezado re
-    LEFT JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
-    LEFT JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
-    inner join Mes M on M.Mesid = RE.Mes
-    inner join EstadoFactura EF on  EF.id = re.Estado
-    inner join vivienda V on V.codigo = re.idVivienda
-    inner join propietarios p on p.idPropietario = V.idPropietario
-     where YEAR(re.fecha_recibo) = ? AND re.Estado = 2
-    GROUP BY DC.idReciboGastoEncabezado, EF.id, v.codigo
-    ORDER BY re.idReciboGastoEncabezado ASC`,[year]);
+    const  [rows] = await connection.query(`SELECT 
+    re.idReciboGastoEncabezado as CodigoEncabezado,
+    CONCAT(p.nombre, ' ', p.apellido) as Propietario,
+    p.correo,
+    M.nombreMes as Mes,
+    EF.Estado as EstadoPago,
+    V.codigo as CodVivienda,
+    SUBSTRING(re.fecha_recibo, 1, 10) as fecha_recibo,
+    COALESCE(SUM(dc.cuota), 0) AS totalRecibo
+FROM ReciboGastoEncabezado re
+LEFT JOIN ReciboGastoDetalle dc ON re.idReciboGastoEncabezado = dc.idReciboGastoEncabezado
+LEFT JOIN Servicios PDC ON dc.idServicio = PDC.idServicio
+INNER JOIN Mes M ON M.Mesid = re.Mes
+INNER JOIN EstadoFactura EF ON EF.id = re.Estado
+INNER JOIN vivienda V ON V.codigo = re.idVivienda
+INNER JOIN propietarios p ON p.idPropietario = V.idPropietario
+ where YEAR(re.fecha_recibo) = 2023 AND re.Estado = 2
+GROUP BY 
+    re.idReciboGastoEncabezado,
+    CONCAT(p.nombre, ' ', p.apellido), -- Include the CONCAT in the GROUP BY
+    p.correo,
+    M.nombreMes,
+    EF.Estado,
+    V.codigo,
+    SUBSTRING(re.fecha_recibo, 1, 10)
+ORDER BY re.idReciboGastoEncabezado ASC`,[year]);
     res.json(rows);
   } catch (error) {
      console.log(error); 
@@ -249,17 +299,32 @@ const facturasPendientesMes = async(req,res) =>{
 const sendMailCliente = async(req,res) =>{
    const {correo, viviendacod,mes, year} = req.body; 
   try {
-    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
-      FROM ReciboGastoEncabezado re
-      INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
-      INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
-      inner join Mes M on M.Mesid = RE.Mes
-      inner join EstadoFactura EF on  EF.id = re.Estado
-      inner join vivienda V on V.codigo = re.idVivienda
-      inner join propietarios p on p.idPropietario = V.idPropietario
-      where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.idVivienda = ? AND re.Estado = 2
-      GROUP BY DC.idReciboGastoEncabezado
-      ORDER BY re.idReciboGastoEncabezado ASC;`,[mes,year,viviendacod]);
+    const  [rows] = await connection.query(`SELECT 
+    re.idReciboGastoEncabezado as CodigoEncabezado,
+    CONCAT(p.nombre, ' ', p.apellido) as Propietario,
+    p.correo,
+    M.nombreMes as Mes,
+    EF.Estado as EstadoPago,
+    V.codigo as CodVivienda,
+    SUBSTRING(re.fecha_recibo, 1, 10) as fecha_recibo,
+    COALESCE(SUM(dc.cuota), 0) AS totalRecibo
+FROM ReciboGastoEncabezado re
+LEFT JOIN ReciboGastoDetalle dc ON re.idReciboGastoEncabezado = dc.idReciboGastoEncabezado
+LEFT JOIN Servicios PDC ON dc.idServicio = PDC.idServicio
+INNER JOIN Mes M ON M.Mesid = re.Mes
+INNER JOIN EstadoFactura EF ON EF.id = re.Estado
+INNER JOIN vivienda V ON V.codigo = re.idVivienda
+INNER JOIN propietarios p ON p.idPropietario = V.idPropietario
+  where MONTH(re.fecha_recibo) = ? AND YEAR(re.fecha_recibo) = ? AND re.idVivienda =  ? AND re.Estado = 2
+GROUP BY 
+    re.idReciboGastoEncabezado,
+    CONCAT(p.nombre, ' ', p.apellido), -- Include the CONCAT in the GROUP BY
+    p.correo,
+    M.nombreMes,
+    EF.Estado,
+    V.codigo,
+    SUBSTRING(re.fecha_recibo, 1, 10)
+ORDER BY re.idReciboGastoEncabezado ASC`,[mes,year,viviendacod]);
       const registros = rows[0]; 
       if(rows.length > 0){
         const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
@@ -333,17 +398,32 @@ const pagarFactura = async(req,res) =>{
   const estadoPagado  = 1;
   try {
     const updateFactura = await connection.query(`UPDATE ReciboGastoEncabezado SET Estado = ${estadoPagado} WHERE idReciboGastoEncabezado = ? AND idVivienda = ?`,[encabezadoFactura, idVivienda]); 
-    const  [rows] = await connection.query(`SELECT RE.idReciboGastoEncabezado as CodigoEncabezado, CONCAT(p.nombre, ' ', p.apellido) as Propietario, p.correo, M.nombreMes as Mes, EF.Estado as EstadoPago, V.codigo as CodVivienda, substring(RE.fecha_recibo,1,10) as fecha_recibo, SUM(dc.cuota) AS totalRecibo
-    FROM ReciboGastoEncabezado re
-    INNER JOIN ReciboGastoDetalle DC ON re.idReciboGastoEncabezado = DC.idReciboGastoEncabezado
-    INNER JOIN Servicios PDC ON DC.idServicio = PDC.idServicio
-    inner join Mes M on M.Mesid = RE.Mes
-    inner join EstadoFactura EF on  EF.id = re.Estado
-    inner join vivienda V on V.codigo = re.idVivienda
-    inner join propietarios p on p.idPropietario = V.idPropietario
-    where re.idReciboGastoEncabezado = ? AND re.idVivienda = ? 
-    GROUP BY DC.idReciboGastoEncabezado
-    ORDER BY re.idReciboGastoEncabezado ASC`,[encabezadoFactura, idVivienda] );
+    const  [rows] = await connection.query(`SELECT 
+    re.idReciboGastoEncabezado as CodigoEncabezado,
+    CONCAT(p.nombre, ' ', p.apellido) as Propietario,
+    p.correo,
+    M.nombreMes as Mes,
+    EF.Estado as EstadoPago,
+    V.codigo as CodVivienda,
+    SUBSTRING(re.fecha_recibo, 1, 10) as fecha_recibo,
+    COALESCE(SUM(dc.cuota), 0) AS totalRecibo
+FROM ReciboGastoEncabezado re
+LEFT JOIN ReciboGastoDetalle dc ON re.idReciboGastoEncabezado = dc.idReciboGastoEncabezado
+LEFT JOIN Servicios PDC ON dc.idServicio = PDC.idServicio
+INNER JOIN Mes M ON M.Mesid = re.Mes
+INNER JOIN EstadoFactura EF ON EF.id = re.Estado
+INNER JOIN vivienda V ON V.codigo = re.idVivienda
+INNER JOIN propietarios p ON p.idPropietario = V.idPropietario
+  where re.idReciboGastoEncabezado = ? AND re.idVivienda =  ?
+GROUP BY 
+    re.idReciboGastoEncabezado,
+    CONCAT(p.nombre, ' ', p.apellido), 
+    p.correo,
+    M.nombreMes,
+    EF.Estado,
+    V.codigo,
+    SUBSTRING(re.fecha_recibo, 1, 10)
+ORDER BY re.idReciboGastoEncabezado ASC;`,[encabezadoFactura, idVivienda] );
     const registros = rows[0]; 
     if(rows.length > 0){
       const detalleFact = await connection.query(`select RD.idDetalle, S.descripcion, RD.cuota from ReciboGastoDetalle RD
