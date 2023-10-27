@@ -5,14 +5,11 @@ const cors = require('cors');
 const { config } = require("dotenv");
 const app = express();
 app.use(express.json());
-const corsOptions = {
-  origin: 'https://proyecto-web-lotificadora.vercel.app',
-  credentials: true, // Habilita el envío de cookies u otros datos de credenciales
-};
+
 
 app.use(express.json());
 app.use(morgan("dev"));
-app.use(cors(corsOptions));
+app.use(cors());
 config();
 
 app.use((req, res, next) => {
