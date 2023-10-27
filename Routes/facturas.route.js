@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express();
-const {getInfoEncabezadosFactura, createFacturaEncabezado, deleteEncabezado, facturasDetalle, createDetallesFactura, deleteDetalles, ConsultaFacturaCliente, facturasPendientesMes, sendMailCliente, pagarFactura} = require('../Controllers/facturas.controller');
+const {getInfoEncabezadosFactura, createFacturaEncabezado, deleteEncabezado, facturasDetalle, createDetallesFactura, deleteDetalles, ConsultaFacturaCliente, facturasPendientesMes, sendMailCliente, pagarFactura, generarPdf} = require('../Controllers/facturas.controller');
 
 //rutas de CRUD 
 router.get('/all', getInfoEncabezadosFactura);
@@ -13,5 +13,5 @@ router.post('/consultafactcliente', ConsultaFacturaCliente);
 router.get('/facturasPendientesMes/:year', facturasPendientesMes); 
 router.post('/sendmail',sendMailCliente);
 router.post('/pagarFactura', pagarFactura); 
-
+router.get('/generarReporte',generarPdf);
 module.exports = router;

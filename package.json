@@ -21,7 +21,9 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mysql2": "^3.6.1",
-    "nodemailer": "^6.9.6"
+    "nodemailer": "^6.9.6",
+    "pdfkit": "^0.13.0",
+    "pdfkit-construct": "^1.2.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
