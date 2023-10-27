@@ -1,5 +1,6 @@
 const { connection } = require("../Database/bd");
-const {transporter}  = require("../services/mailer")
+const {transporter}  = require("../services/mailer");
+const PDF = require("pdfkit-construct");
 require("dotenv").config();
 
 const getInfoEncabezadosFactura = async(req, res) => {
@@ -492,6 +493,88 @@ ORDER BY re.idReciboGastoEncabezado ASC;`,[encabezadoFactura, idVivienda] );
   }
 }
 
+const generarPdf = async (req, res) => {
+  try {
+    const facturasEncabezados = await connection.query(
+      `SELECT 
+      re.idReciboGastoEncabezado as CodigoEncabezado,
+      CONCAT(p.nombre, ' ', p.apellido) as Propietario,
+      p.correo,
+      M.nombreMes as Mes,
+      EF.Estado as EstadoPago,
+      V.codigo as CodVivienda,
+      SUBSTRING(re.fecha_recibo, 1, 10) as fecha_recibo,
+      COALESCE(SUM(dc.cuota), 0) AS totalRecibo
+  FROM ReciboGastoEncabezado re
+  LEFT JOIN ReciboGastoDetalle dc ON re.idReciboGastoEncabezado = dc.idReciboGastoEncabezado
+  LEFT JOIN Servicios PDC ON dc.idServicio = PDC.idServicio
+  INNER JOIN Mes M ON M.Mesid = re.Mes
+  INNER JOIN EstadoFactura EF ON EF.id = re.Estado
+  INNER JOIN vivienda V ON V.codigo = re.idVivienda
+  INNER JOIN propietarios p ON p.idPropietario = V.idPropietario
+  GROUP BY 
+      re.idReciboGastoEncabezado,
+      CONCAT(p.nombre, ' ', p.apellido), -- Include the CONCAT in the GROUP BY
+      p.correo,
+      M.nombreMes,
+      EF.Estado,
+      V.codigo,
+      SUBSTRING(re.fecha_recibo, 1, 10)
+  ORDER BY re.idReciboGastoEncabezado ASC`
+    );
+    if (facturasEncabezados[0].length > 0) {
+     
+      const doc = new PDF({ bufferPages: true, layout: {orientation: 'landscape', size: {width: 600, height: 600}}});
+      const stream = res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment;filename=ReporteDefacturasGeneradas.pdf`,
+      });
+      doc.on("data", (chunk) => stream.write(chunk));
+      doc.on("end", () => stream.end());
+      doc.setDocumentHeader(
+        {
+          height: "15",
+        },
+        () => {
+          doc.fontSize(15).text("REPORTE DE FACTURAS GENERADAS", {
+            width: 420,
+            align: "center",
+          });
+        }
+      );
+
+        doc.addTable(
+          [
+            { key: "CodigoEncabezado", label: "CodigoEncabezado", align: "left" },
+            { key: "Propietario", label: "Propietario", align: "left" },
+            { key: "correo", label: "correo propietario", align: "left" },
+            { key: "Mes", label: "Mes" },
+            { key: "EstadoPago", label: "Estado pago", align: "right" },
+            { key: "CodVivienda", label: "Codigo vivienda", align: "right" },
+            { key: "fecha_recibo", label: "Fecha", align: "right" },
+            { key: "totalRecibo", label: "TOTAL Q", align: "right" },
+          ],
+          facturasEncabezados[0],
+          {
+            border: null,
+            width: "fill_body",
+            striped: true,
+            cellsPadding: 10,
+            marginTop: 10,
+            marginLeft: 25,
+            marginRight: 25,
+            headAlign: "left",
+          }
+        );
+        doc.render();
+        doc.end();
+      }
+  } catch (error) {
+    console.log(error);
+    res.json({ message: "algo ocurrio mal" });
+  }
+};
+
 module.exports = {
   getInfoEncabezadosFactura,
   createFacturaEncabezado,
@@ -502,5 +585,6 @@ module.exports = {
   ConsultaFacturaCliente,
   facturasPendientesMes,
   sendMailCliente,
-  pagarFactura
+  pagarFactura,
+  generarPdf
 };
